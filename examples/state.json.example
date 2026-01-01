@@ -115,5 +115,65 @@
     "conclusion": null,
     "confidence": null,
     "expansion_attempts": 0
-  }
+  },
+
+  "_comment_hard_rules": "HARD RULES - Rule 3: No-Edge Guardrails (Minimum Segmentation Scan Set)",
+  "segmentation_scan": {
+    "minimum_set": ["sector", "market_cap", "volatility", "liquidity", "instrument_type", "component_ablations"],
+    "completed": {
+      "sector": true,
+      "market_cap": true,
+      "volatility": true,
+      "liquidity": true,
+      "instrument_type": true,
+      "component_ablations": false
+    },
+    "results": {
+      "sector": {
+        "tested": true,
+        "best_pocket": "Technology sector shows Sharpe 1.4 vs 0.8 overall",
+        "worst_pocket": "Utilities sector shows negative expectation",
+        "notes": "Clear sector concentration - proceed with caution on diversification claims"
+      },
+      "market_cap": {
+        "tested": true,
+        "best_pocket": "Large cap shows Sharpe 1.2 vs 0.6 in small cap",
+        "worst_pocket": "Micro cap negative after transaction costs",
+        "notes": "Expected given liquidity constraints"
+      },
+      "volatility": {
+        "tested": true,
+        "best_pocket": "VIX < 20: Sharpe 1.8",
+        "worst_pocket": "VIX > 30: Sharpe -0.2",
+        "notes": "Strong regime dependency - must filter or hedge"
+      },
+      "liquidity": {
+        "tested": true,
+        "best_pocket": "Liquid hours (9:30-11:00): Sharpe 1.5",
+        "worst_pocket": "Overnight: Sharpe 0.3 with higher slippage",
+        "notes": "Execution timing critical"
+      },
+      "instrument_type": {
+        "tested": true,
+        "best_pocket": "ES futures: Sharpe 1.3",
+        "worst_pocket": "NQ futures: Sharpe 0.4 (different dynamics)",
+        "notes": "Strategy specific to ES - not generalizable"
+      },
+      "component_ablations": {
+        "tested": false,
+        "best_pocket": null,
+        "worst_pocket": null,
+        "notes": "PENDING: Need to ablate momentum lookback, entry threshold, exit rules"
+      }
+    },
+    "summary": {
+      "scans_complete": 5,
+      "scans_pending": 1,
+      "best_pockets": ["VIX < 20", "Large cap", "Liquid hours"],
+      "worst_pockets": ["VIX > 30", "Micro cap", "Overnight"],
+      "notes": "Strong conditional edge in specific regimes. Unconditional appears weak due to regime mixing."
+    }
+  },
+  "can_conclude_no_edge": false,
+  "no_edge_block_reason": "component_ablations scan not complete - cannot rule out edge in specific parameter configurations"
 }

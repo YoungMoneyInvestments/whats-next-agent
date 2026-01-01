@@ -1,0 +1,325 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://whatsnext.agent/schemas/iteration.schema.json",
+  "title": "Iteration Output Schema",
+  "description": "JSON Schema for /whats-next iteration output files. Each iteration MUST validate against this schema before being written to .whatsnext/experiments/",
+  "type": "object",
+  "required": [
+    "iteration",
+    "timestamp",
+    "state_assessment",
+    "agent_dispatches",
+    "chosen_step",
+    "gate_results",
+    "mandatory_checks",
+    "segmentation_scan_status",
+    "convergence",
+    "artifacts"
+  ],
+  "properties": {
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Iteration number (1-indexed)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of iteration completion"
+    },
+    "state_assessment": {
+      "type": "object",
+      "required": ["completed", "unknown", "key_risks", "classification", "consensus", "blocking_agents"],
+      "properties": {
+        "completed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of completed items"
+        },
+        "unknown": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of unknowns remaining"
+        },
+        "key_risks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of identified risks"
+        },
+        "classification": {
+          "type": "string",
+          "enum": ["research_only", "paper_alpha", "conditional_alpha_candidate", "capital_deployable", "rejected"],
+          "description": "Current classification level"
+        },
+        "consensus": {
+          "type": "boolean",
+          "description": "Whether all agents agree"
+        },
+        "blocking_agents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of agents with BLOCK verdict"
+        }
+      }
+    },
+    "agent_dispatches": {
+      "type": "object",
+      "required": [
+        "quant_research_generator",
+        "quant_skeptic_redteam",
+        "quant_ml_validation_engineer",
+        "quant_execution_microstructure",
+        "quant_capital_allocation_risk",
+        "quant_manager_audit"
+      ],
+      "properties": {
+        "quant_research_generator": {
+          "$ref": "#/definitions/agent_output"
+        },
+        "quant_skeptic_redteam": {
+          "$ref": "#/definitions/agent_output"
+        },
+        "quant_ml_validation_engineer": {
+          "$ref": "#/definitions/agent_output"
+        },
+        "quant_execution_microstructure": {
+          "$ref": "#/definitions/agent_output"
+        },
+        "quant_capital_allocation_risk": {
+          "$ref": "#/definitions/agent_output"
+        },
+        "quant_manager_audit": {
+          "$ref": "#/definitions/agent_output"
+        }
+      }
+    },
+    "chosen_step": {
+      "type": "object",
+      "required": ["step", "rationale", "evidence"],
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "What was executed"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this step was selected"
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts produced"
+        }
+      }
+    },
+    "gate_results": {
+      "type": "object",
+      "required": ["tests", "backtest", "validation"],
+      "properties": {
+        "tests": {
+          "type": "string",
+          "enum": ["pass", "fail", "skipped", "error"],
+          "description": "Test suite result"
+        },
+        "backtest": {
+          "oneOf": [
+            { "type": "string", "enum": ["skipped", "error"] },
+            {
+              "type": "object",
+              "properties": {
+                "sharpe": { "type": "number" },
+                "drawdown": { "type": "number" },
+                "win_rate": { "type": "number" },
+                "trades": { "type": "integer" }
+              }
+            }
+          ],
+          "description": "Backtest metrics or status"
+        },
+        "validation": {
+          "type": "string",
+          "enum": ["pass", "fail", "skipped", "error"],
+          "description": "Validation result"
+        }
+      }
+    },
+    "mandatory_checks": {
+      "type": "object",
+      "required": [
+        "anti_goodhart",
+        "null_hypothesis",
+        "negative_expectation",
+        "execution_reality",
+        "capital_scaling",
+        "definition_unpacking",
+        "conditional_edge"
+      ],
+      "properties": {
+        "anti_goodhart": {
+          "$ref": "#/definitions/check_status"
+        },
+        "null_hypothesis": {
+          "$ref": "#/definitions/check_status"
+        },
+        "negative_expectation": {
+          "$ref": "#/definitions/check_status"
+        },
+        "execution_reality": {
+          "$ref": "#/definitions/check_status"
+        },
+        "capital_scaling": {
+          "$ref": "#/definitions/check_status"
+        },
+        "definition_unpacking": {
+          "$ref": "#/definitions/check_status"
+        },
+        "conditional_edge": {
+          "$ref": "#/definitions/check_status"
+        }
+      }
+    },
+    "segmentation_scan_status": {
+      "type": "object",
+      "required": [
+        "sector",
+        "market_cap",
+        "volatility",
+        "liquidity",
+        "instrument_type",
+        "component_ablations",
+        "can_conclude_no_edge",
+        "missing_scans"
+      ],
+      "properties": {
+        "sector": {
+          "type": "string",
+          "enum": ["complete", "pending", "in_progress", "not_applicable"],
+          "description": "Sector segmentation scan status"
+        },
+        "market_cap": {
+          "type": "string",
+          "enum": ["complete", "pending", "in_progress", "not_applicable"],
+          "description": "Market cap segmentation scan status"
+        },
+        "volatility": {
+          "type": "string",
+          "enum": ["complete", "pending", "in_progress", "not_applicable"],
+          "description": "Volatility regime segmentation scan status"
+        },
+        "liquidity": {
+          "type": "string",
+          "enum": ["complete", "pending", "in_progress", "not_applicable"],
+          "description": "Liquidity segmentation scan status"
+        },
+        "instrument_type": {
+          "type": "string",
+          "enum": ["complete", "pending", "in_progress", "not_applicable"],
+          "description": "Instrument type segmentation scan status"
+        },
+        "component_ablations": {
+          "type": "string",
+          "enum": ["complete", "pending", "in_progress", "not_applicable"],
+          "description": "Component ablation scan status"
+        },
+        "can_conclude_no_edge": {
+          "type": "boolean",
+          "description": "Whether all minimum scans are complete (only then can 'no edge' be concluded)"
+        },
+        "missing_scans": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of incomplete scans from the minimum set"
+        }
+      }
+    },
+    "convergence": {
+      "type": "object",
+      "required": ["classification", "consensus", "info_gain", "decision"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "description": "Current classification"
+        },
+        "consensus": {
+          "type": "boolean",
+          "description": "Whether consensus was reached"
+        },
+        "info_gain": {
+          "type": "string",
+          "enum": ["high", "medium", "low"],
+          "description": "Information gain this iteration"
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["continue", "pivot", "stop"],
+          "description": "Loop decision"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["reasoning_events_appended", "iteration_json_path", "schema_validated", "state_updated"],
+      "properties": {
+        "reasoning_events_appended": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of reasoning events appended to JSONL log"
+        },
+        "iteration_json_path": {
+          "type": "string",
+          "description": "Path to this iteration's JSON file"
+        },
+        "schema_validated": {
+          "type": "boolean",
+          "description": "Whether this iteration passed schema validation"
+        },
+        "state_updated": {
+          "type": "boolean",
+          "description": "Whether state.json was updated"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "agent_output": {
+      "type": "object",
+      "required": ["verdict", "summary"],
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["APPROVE", "BLOCK", "CONDITIONAL"],
+          "description": "Agent's verdict"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Brief summary of agent's assessment"
+        },
+        "key_objections": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of key objections (if any)"
+        },
+        "conditional_requirements": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Requirements for CONDITIONAL verdict"
+        }
+      }
+    },
+    "check_status": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "pending", "not_applicable"],
+          "description": "Check result"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the check"
+        }
+      }
+    }
+  }
+}

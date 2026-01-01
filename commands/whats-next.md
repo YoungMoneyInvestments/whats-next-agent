@@ -35,6 +35,277 @@ You MUST use persistent memory and evidence. You may not claim success without o
 
 ---
 
+## HARD RULES (Override All Other Instructions)
+
+These rules are mandatory and override any conflicting instruction elsewhere in this document.
+
+### Rule 1: Reasoning Events Log (MANDATORY)
+
+You MUST maintain an append-only JSONL log at:
+
+```
+.whatsnext/reasoning_events.jsonl
+```
+
+A reasoning event is one JSON object per line. You MUST write an event:
+1. At the start of the command
+2. After parsing input
+3. After reading state.json
+4. After proposer output is captured
+5. After each critique agent output is captured
+6. Before executing a chosen step
+7. After running any objective gate or test
+8. After any backtest or metric computation
+9. After any segmentation scan or ablation run
+10. Immediately before updating state.json
+11. Immediately after writing iteration_NNN.json
+12. Immediately before concluding the run
+
+**Required JSONL event schema (one object per line):**
+
+```json
+{
+  "event_id": "uuid_or_monotonic_id",
+  "ts_utc": "ISO_8601",
+  "iteration": 1,
+  "stage": "parse|state_read|propose|critique|execute|gates|segment|ablate|decide|writeback|conclude",
+  "actor": "system|proposer|critic|validator|execution|risk|arbiter|executor",
+  "thought": "string - concise and operational",
+  "thoughtNumber": 1,
+  "totalThoughts": 10,
+  "nextThoughtNeeded": true,
+  "isRevision": false,
+  "revisesThought": null,
+  "branchFromThought": null,
+  "branchId": null,
+  "needsMoreThoughts": null,
+  "artifacts_written": ["optional list of paths"],
+  "metrics_snapshot": { "optional": "object" },
+  "segmentation_snapshot": { "optional": "object" },
+  "decision_delta": { "optional": "object" }
+}
+```
+
+The `thought` field must be concise and operational - a short description of what you are doing and why, not hidden chain of thought.
+
+### Rule 2: Iteration Schema Validation (MANDATORY)
+
+You MUST create and enforce a JSON Schema file at:
+
+```
+.whatsnext/schemas/iteration.schema.json
+```
+
+If it does not exist, create it from the schema defined in this document.
+
+For every iteration, you MUST:
+1. Write `.whatsnext/experiments/iteration_NNN.json`
+2. Validate it against the schema before continuing
+3. If validation fails, rewrite until it validates
+
+**Validation protocol:**
+1. If python is available, run schema validation using `jsonschema` if installed
+2. If `jsonschema` is not installed, self-validate required keys and basic types
+3. Fix any validation errors before proceeding
+
+**Minimum iteration schema (save as `.whatsnext/schemas/iteration.schema.json`):**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "whats-next-agent quant iteration log",
+  "type": "object",
+  "required": ["schema_version", "iteration", "ts_utc", "objective", "experiments", "segmentation_scan", "decision", "agent_votes", "artifacts"],
+  "properties": {
+    "schema_version": { "type": "string", "enum": ["1.0"] },
+    "iteration": { "type": "integer", "minimum": 1 },
+    "ts_utc": { "type": "string" },
+    "objective": {
+      "type": "object",
+      "required": ["description", "success_criteria", "constraints"],
+      "properties": {
+        "description": { "type": "string" },
+        "success_criteria": { "type": "string" },
+        "constraints": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "universe": {
+      "type": "object",
+      "properties": {
+        "instrument_type": { "type": "string" },
+        "symbols": { "type": "array", "items": { "type": "string" } },
+        "data_range": { "type": "string" },
+        "filters": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "experiments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["experiment_id", "experiment_type", "inputs", "results", "metrics", "segmentation", "ablations"],
+        "properties": {
+          "experiment_id": { "type": "string" },
+          "experiment_type": { "type": "string", "enum": ["baseline", "backtest", "validation", "segmentation_scan", "component_ablation", "instrument_subset", "other"] },
+          "inputs": { "type": "object" },
+          "results": { "type": "object" },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "win_rate": { "type": "number" },
+              "avg_return": { "type": "number" },
+              "profit_factor": { "type": "number" },
+              "sharpe": { "type": "number" },
+              "sortino": { "type": "number" },
+              "max_drawdown": { "type": "number" },
+              "clv": { "type": "number" },
+              "hit_rate": { "type": "number" },
+              "sample_size": { "type": "integer" }
+            },
+            "additionalProperties": true
+          },
+          "segmentation": {
+            "type": "object",
+            "properties": {
+              "dimension": { "type": "string" },
+              "bucket_definition": { "type": "string" },
+              "bucket_key": { "type": "string" },
+              "bucket_value": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "ablations": {
+            "type": "object",
+            "properties": {
+              "component_name": { "type": ["string", "null"] },
+              "ablation_type": { "type": ["string", "null"] }
+            },
+            "additionalProperties": true
+          },
+          "artifacts": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "segmentation_scan": {
+      "type": "object",
+      "required": ["minimum_set", "completed", "summary"],
+      "properties": {
+        "minimum_set": {
+          "type": "array",
+          "items": { "type": "string" },
+          "const": ["sector", "market_cap", "volatility", "liquidity", "instrument_type", "component_ablations"]
+        },
+        "completed": {
+          "type": "object",
+          "required": ["sector", "market_cap", "volatility", "liquidity", "instrument_type", "component_ablations"],
+          "properties": {
+            "sector": { "type": "boolean" },
+            "market_cap": { "type": "boolean" },
+            "volatility": { "type": "boolean" },
+            "liquidity": { "type": "boolean" },
+            "instrument_type": { "type": "boolean" },
+            "component_ablations": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "best_pockets": { "type": "array", "items": { "type": "object" } },
+            "worst_pockets": { "type": "array", "items": { "type": "object" } },
+            "notes": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "decision": {
+      "type": "object",
+      "required": ["outcome", "rationale", "next_action", "can_conclude_no_edge"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["continue", "pivot", "stop", "declare_edge", "no_edge"] },
+        "rationale": { "type": "string" },
+        "next_action": { "type": "string" },
+        "can_conclude_no_edge": { "type": "boolean" },
+        "evidence_links": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "agent_votes": { "type": "object" },
+    "artifacts": {
+      "type": "object",
+      "required": ["reasoning_events_path", "role_outputs", "iteration_json_path"],
+      "properties": {
+        "reasoning_events_path": { "type": "string" },
+        "role_outputs": { "type": "array", "items": { "type": "string" } },
+        "iteration_json_path": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
+```
+
+### Rule 3: No-Edge Guardrails (MANDATORY)
+
+You are **FORBIDDEN** from concluding "no edge", "pattern has no edge", "alpha does not exist", or classification `rejected` due to lack of edge UNTIL **ALL** of the following are true:
+
+```
+segmentation_scan.completed.sector = true
+segmentation_scan.completed.market_cap = true
+segmentation_scan.completed.volatility = true
+segmentation_scan.completed.liquidity = true
+segmentation_scan.completed.instrument_type = true
+segmentation_scan.completed.component_ablations = true
+```
+
+**Definition of Minimum Segmentation Scan Set:**
+
+| Dimension | Definition |
+|-----------|------------|
+| **Sector** | Bucket by sector classification if available, else proxy by industry or ETF sector membership |
+| **Market Cap** | Bucket into at least 3 tiers: small, mid, large (or terciles) |
+| **Volatility** | Bucket into at least 3 tiers using ATR, NATR, or realized vol terciles |
+| **Liquidity** | Bucket into at least 3 tiers using dollar volume or volume terciles |
+| **Instrument Type** | At minimum split: ETFs, leveraged ETFs, single stocks, futures, crypto, or any types present |
+| **Component Ablations** | For each scoring component/feature family: test predictive power alone AND test removal from composite |
+
+These can be executed across multiple iterations, but you MUST track completion in `state.json` and in `iteration_NNN.json`.
+
+**No-Edge Guardrail Logic:**
+
+```
+IF decision.outcome == "no_edge":
+    IF ALL segmentation_scan.completed.* == true:
+        decision.can_conclude_no_edge = true
+        # Allowed to conclude no edge
+    ELSE:
+        decision.can_conclude_no_edge = false
+        decision.outcome = "continue" OR "pivot"
+        # MUST schedule missing segmentation scans as next steps
+        # FORBIDDEN to conclude no edge
+```
+
+You MUST log a reasoning event whenever you update any segmentation completion flag.
+
+### Writeback Requirements (MANDATORY)
+
+After each iteration you MUST:
+
+1. Append reasoning events to `.whatsnext/reasoning_events.jsonl`
+2. Write `iteration_NNN.json` that validates against `.whatsnext/schemas/iteration.schema.json`
+3. Update `state.json` to include segmentation scan completion status and any new blockers
+4. Reference the reasoning log path and iteration JSON path in the decision summary
+
+**Failure to comply is a hard failure. If any step fails, fix it before proceeding.**
+
+---
+
 ## INPUT PARSING
 
 On receiving input, first parse the configuration:
@@ -72,12 +343,15 @@ Dispatch to these agents using the Task tool. Do NOT role-play these perspective
 
 ```
 .whatsnext/
-├── config.json           # Parsed input configuration
-├── state.json            # Current loop state (schema below)
-├── journal.md            # Human-readable decision timeline
-├── experiments/          # One JSON per iteration
+├── config.json              # Parsed input configuration
+├── state.json               # Current loop state (schema below)
+├── journal.md               # Human-readable decision timeline
+├── reasoning_events.jsonl   # Append-only reasoning log (RULE 1)
+├── schemas/                 # JSON schemas for validation
+│   └── iteration.schema.json
+├── experiments/             # One JSON per iteration
 │   └── iteration_NNN.json
-├── role_outputs/         # Agent outputs per iteration
+├── role_outputs/            # Agent outputs per iteration
 │   ├── proposer.md
 │   ├── critic.md
 │   ├── validator.md
@@ -85,7 +359,7 @@ Dispatch to these agents using the Task tool. Do NOT role-play these perspective
 │   ├── risk.md
 │   ├── executor.md
 │   └── arbiter.md
-└── checkpoints/          # Git context snapshots
+└── checkpoints/             # Git context snapshots
 ```
 
 ### state.json Schema
@@ -142,7 +416,26 @@ Dispatch to these agents using the Task tool. Do NOT role-play these perspective
     "conclusion": null,
     "confidence": null,
     "expansion_attempts": 0
-  }
+  },
+
+  "_comment_hard_rules": "Fields below support HARD RULES (Rule 3: No-Edge Guardrails)",
+  "segmentation_scan": {
+    "minimum_set": ["sector", "market_cap", "volatility", "liquidity", "instrument_type", "component_ablations"],
+    "completed": {
+      "sector": false,
+      "market_cap": false,
+      "volatility": false,
+      "liquidity": false,
+      "instrument_type": false,
+      "component_ablations": false
+    },
+    "summary": {
+      "best_pockets": [],
+      "worst_pockets": [],
+      "notes": null
+    }
+  },
+  "can_conclude_no_edge": false
 }
 ```
 
@@ -635,11 +928,27 @@ CONDITIONAL EDGE DISCOVERY (if triggered)
 ├─ P-Hacking Controls: [validation design]
 └─ Pockets Found: [list or none]
 
+SEGMENTATION SCAN STATUS (HARD RULE 3)
+├─ Sector: [complete/pending]
+├─ Market Cap: [complete/pending]
+├─ Volatility: [complete/pending]
+├─ Liquidity: [complete/pending]
+├─ Instrument Type: [complete/pending]
+├─ Component Ablations: [complete/pending]
+├─ Can Conclude No-Edge: [true/false]
+└─ Missing Scans: [list of pending scans]
+
 CONVERGENCE
 ├─ Classification: [current]
 ├─ Consensus: [true/false]
 ├─ Info Gain: [high/medium/low]
 └─ Decision: [continue/pivot/stop]
+
+ARTIFACTS (HARD RULES COMPLIANCE)
+├─ Reasoning Events: .whatsnext/reasoning_events.jsonl [N events appended]
+├─ Iteration JSON: .whatsnext/experiments/iteration_NNN.json [validated: yes/no]
+├─ Schema Validation: [passed/failed/fixed]
+└─ State Updated: [confirmed]
 
 LOG WRITEBACK: [confirmed]
 ═══════════════════════════════════════════════════════════════
