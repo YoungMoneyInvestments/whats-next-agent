@@ -120,7 +120,29 @@ Dispatch to these agents using the Task tool. Do NOT role-play these perspective
 
   "chosen_step": null,
   "last_gate_results": {},
-  "low_info_streak": 0
+  "low_info_streak": 0,
+
+  "_comment_edge_discovery": "Fields below support Conditional Edge Discovery Protocol",
+  "definition_of_working": null,
+  "definition_of_broken": null,
+  "realm_check_notes": null,
+  "segmentation_hypotheses": [],
+  "segmentation_tests_run": [],
+  "best_pockets_found": [],
+  "p_hacking_risk_notes": null,
+
+  "_comment_uniqueness": "Fields below support Uniqueness Verification Protocol",
+  "search_log": {
+    "task": null,
+    "queries": [],
+    "sources_checked": [],
+    "open_source_alternatives": [],
+    "commercial_alternatives": [],
+    "academic_references": [],
+    "conclusion": null,
+    "confidence": null,
+    "expansion_attempts": 0
+  }
 }
 ```
 
@@ -298,9 +320,30 @@ The `quant-manager-audit` agent assigns ONE classification:
 | Classification | Meaning | Consensus Required | Next Action |
 |----------------|---------|-------------------|-------------|
 | `research_only` | Interesting but unproven | No | Continue iterating |
+| `conditional_alpha_candidate` | Unconditional fails but pocket shows promise | No | Validate pocket on holdout |
 | `paper_alpha` | Backtested, not live-ready | Partial | Harden execution/risk |
 | `capital_deployable` | Production ready | **Yes - ALL agents** | May output `<DONE>` |
 | `rejected` | Does not survive scrutiny | No | Pivot or stop |
+
+### Classification Transitions
+
+```
+research_only → conditional_alpha_candidate
+  WHEN: Unconditional results fail BUT segmentation reveals promising pocket
+  REQUIRES: Pocket hypothesis defined, initial test shows positive signal
+
+conditional_alpha_candidate → paper_alpha
+  WHEN: Pocket validated on holdout sample
+  REQUIRES: Holdout confirmation, p-hacking controls documented
+
+conditional_alpha_candidate → research_only
+  WHEN: Pocket fails holdout validation
+  REQUIRES: Mark pocket as "spurious", try different segment
+
+paper_alpha → capital_deployable
+  WHEN: All agents approve, execution realistic, risk acceptable
+  REQUIRES: Full consensus, all mandatory checks pass
+```
 
 ### Consensus Rules
 
@@ -341,6 +384,188 @@ These checks are enforced by the specialized agents:
 - Correlation with existing strategies?
 - Tail risk under stress?
 
+### Definition Unpacking Check (ALL AGENTS)
+If any agent uses terms like "broken", "noise", "coin flip", or "no edge":
+- **MUST** first define what "broken" means with specific criteria
+- **MUST** define what "working" would look like with measurable outcomes
+- **MUST** show evidence supporting the claim, not just assertion
+- Undefined dismissals are automatically flagged as incomplete analysis
+
+### Conditional Edge Check (quant-research-generator, quant-manager-audit)
+If unconditional results are weak, flat, or negative:
+- The next iteration **MUST** include at least one conditional pocket test plan
+- Cannot conclude "no edge exists" without testing conditional hypotheses
+- Component ablation alone is insufficient - segmentation is required
+- Update state with segmentation_hypotheses and chosen test
+
+---
+
+## CONDITIONAL EDGE DISCOVERY PROTOCOL
+
+**This protocol is MANDATORY whenever any of the following occur:**
+- Performance is flat or negative on unconditional averages
+- Score correlations are opposite of intent
+- Metrics disagree (e.g., high Sharpe but low hit rate)
+- Sample sizes are small in key buckets
+- Any agent says "broken", "noise", "coin flip", or "no edge"
+
+### Protocol Steps (Ordered, Not Optional)
+
+**Step 1: Define Terms**
+```
+Before any conclusion, explicitly define:
+- What does "broken" mean? (specific metric thresholds)
+- What would "working" look like? (specific success criteria)
+- Which metric should move and in which direction?
+- What is the null hypothesis being tested?
+
+Write to state.json:
+  definition_of_broken: "..."
+  definition_of_working: "..."
+```
+
+**Step 2: Realm of Possibility Check**
+```
+Evaluate the claim against domain priors:
+- Is this claim plausible given market structure?
+- What do experienced traders expect in this context?
+- Does this match historical precedent?
+- What would make this claim surprising if true?
+
+Write to state.json:
+  realm_check_notes: "..."
+```
+
+**Step 3: Generate Conditional Hypotheses**
+```
+List AT LEAST 6 segmentation axes that could reveal hidden edge:
+1. Instrument (which symbols/assets)
+2. Sector (which industries/sectors)
+3. Market Cap (large/mid/small/micro)
+4. Volatility Regime (low/medium/high VIX)
+5. Liquidity (high/low volume, spread regimes)
+6. Trend Regime (trending/ranging/reverting)
+7. Calendar/Event (earnings, FOMC, expiration, seasonality)
+8. Time of Day (open, close, overnight)
+
+Write to state.json:
+  segmentation_hypotheses: ["axis1: hypothesis", "axis2: hypothesis", ...]
+```
+
+**Step 4: Choose Next Smallest Test**
+```
+Select 1 segmentation that maximizes expected information gain:
+- Which segment has the clearest prior hypothesis?
+- Which is testable with available data?
+- Which has sufficient sample size for signal?
+
+Prefer tests that can FALSIFY the hypothesis quickly.
+
+Write to state.json:
+  chosen_step: "Segment by [axis]: test [hypothesis]"
+```
+
+**Step 5: Anti-P-Hacking Gate**
+```
+ANY segmentation discovery MUST be validated:
+- Holdout sample (minimum 30% of data)
+- Walk-forward split (train on past, test on future)
+- Multiple testing correction if >3 segments tested
+
+If discovery fails validation:
+- Mark as "spurious" not "edge"
+- Do not count toward progress
+
+Write to state.json:
+  p_hacking_risk_notes: "Tested N segments, applied [correction], holdout result: ..."
+```
+
+**Step 6: Update State**
+```
+Record iteration results:
+- Which segments were tested
+- What passed vs failed
+- Why next test was chosen
+- Best pockets found (if any)
+
+Write to state.json:
+  segmentation_tests_run: [{"axis": "...", "result": "...", "holdout_validated": bool}]
+  best_pockets_found: [{"segment": "...", "metrics": {...}, "validated": bool}]
+```
+
+### Protocol Output Format
+
+```
+CONDITIONAL EDGE DISCOVERY
+├─ Trigger: [why protocol activated]
+├─ Definition of Broken: [specific criteria]
+├─ Definition of Working: [specific success criteria]
+├─ Realm Check: [plausibility assessment]
+├─ Hypotheses Generated: [N segmentation axes]
+├─ Chosen Test: [segment and hypothesis]
+├─ Anti-P-Hacking: [validation design]
+└─ State Updated: [confirmed]
+```
+
+---
+
+## UNIQUENESS VERIFICATION PROTOCOL
+
+**This protocol is MANDATORY when user asks "is this unique", "verify on the internet", "check for alternatives", or similar.**
+
+### Minimum Search Requirements
+
+```
+MUST complete before concluding uniqueness:
+- Minimum 5 distinct search queries
+- Minimum 4 distinct sources
+- Must include at least:
+  ├─ 1 open source alternative search
+  ├─ 1 commercial/proprietary alternative search
+  ├─ 1 academic paper or research blog search
+  └─ 1 adjacent competitor/term search
+
+If initial searches return nothing:
+- EXPAND queries with synonyms
+- Try adjacent terms and competitor names
+- Search for component parts, not just whole concept
+- Minimum 3 expansion attempts before concluding "not found"
+```
+
+### Search Log Requirements
+
+```
+Write to state.json:
+  search_log: {
+    "task": "uniqueness verification for [topic]",
+    "queries": [
+      {"query": "...", "source": "...", "results_found": N, "relevant": bool}
+    ],
+    "sources_checked": ["...", "...", ...],
+    "open_source_alternatives": [...],
+    "commercial_alternatives": [...],
+    "academic_references": [...],
+    "conclusion": "unique because X / not unique because Y",
+    "confidence": "high/medium/low",
+    "expansion_attempts": N
+  }
+```
+
+### Uniqueness Verdict Format
+
+```
+UNIQUENESS VERIFICATION
+├─ Queries Run: [N of minimum 5]
+├─ Sources Checked: [N of minimum 4]
+├─ Open Source Alternatives: [list or "none found after N searches"]
+├─ Commercial Alternatives: [list or "none found after N searches"]
+├─ Academic References: [list or "none found after N searches"]
+├─ Query Expansions: [N attempts]
+├─ Conclusion: [unique/not unique/partially unique]
+├─ Confidence: [high/medium/low]
+└─ Search Log: [written to state.json]
+```
+
 ---
 
 ## STOP CONDITIONS
@@ -370,7 +595,7 @@ STATE ASSESSMENT
 ├─ Completed: [list]
 ├─ Unknown: [list]
 ├─ Key Risks: [list]
-├─ Classification: [research_only / paper_alpha / capital_deployable / rejected]
+├─ Classification: [research_only / conditional_alpha_candidate / paper_alpha / capital_deployable / rejected]
 └─ Consensus: [true/false] - Blocking: [agent list]
 
 AGENT DISPATCHES
@@ -396,7 +621,19 @@ MANDATORY CHECKS
 ├─ Null Hypothesis: [status]
 ├─ Negative Expectation: [status]
 ├─ Execution Reality: [status]
-└─ Capital Scaling: [status]
+├─ Capital Scaling: [status]
+├─ Definition Unpacking: [status] - terms defined / undefined dismissal flagged
+└─ Conditional Edge: [status] - pocket test planned / not applicable
+
+CONDITIONAL EDGE DISCOVERY (if triggered)
+├─ Trigger: [flat/negative/metrics disagree/etc.]
+├─ Definition of Working: [criteria]
+├─ Definition of Broken: [criteria]
+├─ Realm Check: [plausible/implausible]
+├─ Hypotheses: [N axes generated]
+├─ Chosen Test: [segment and hypothesis]
+├─ P-Hacking Controls: [validation design]
+└─ Pockets Found: [list or none]
 
 CONVERGENCE
 ├─ Classification: [current]
