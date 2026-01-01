@@ -1,151 +1,237 @@
-# /whats-next
+# /whats-next (Quant Edition)
 
-An autonomous multi-role self-play agent for Claude Code that advances your project with minimal intervention.
+An autonomous multi-agent system for quantitative trading research that dispatches to **real specialized agents** with hardcoded skepticism.
 
-One command. Loops until done or blocked.
+> **This is the `quant` branch.** For the generic project-agnostic version, see the [`main` branch](https://github.com/YoungMoneyInvestments/whats-next-agent/tree/main).
 
-> **Looking for quant-specific features?** See the [`quant` branch](https://github.com/YoungMoneyInvestments/whats-next-agent/tree/quant) which dispatches to real specialized agents with hardcoded skepticism.
+## Why Quant Edition?
 
-## What it does
+The generic `/whats-next` uses internal role-play (one Claude instance pretending to be Proposer, Critic, etc.). This works for general software, but **quant research needs structural skepticism that can't be negotiated away**.
 
-`/whats-next` runs an autonomous improvement cycle that:
+This version dispatches to 6 specialized agents via Claude Code's Task tool:
 
-1. **Reads repo state** - Understands what exists and what's been done
-2. **Self-plays 6 roles** - Proposer, Critic, Alternatives, Arbiter, Executor, Referee
-3. **Executes via sandbox** - Runs actual commands, not just suggestions
-4. **Validates with gates** - Tests, lints, backtests must pass
-5. **Logs everything** - Persistent memory in `.whatsnext/`
-6. **Loops automatically** - Until done, blocked, or stalled
+| Agent | Role | Skepticism Level |
+|-------|------|------------------|
+| `quant-research-generator` | Propose hypotheses | Creative, exploratory |
+| `quant-skeptic-redteam` | Attack all assumptions | **Maximum** - cannot be softened |
+| `quant-ml-validation-engineer` | Metrics, overfitting, leakage | High - treats improvements as provisional |
+| `quant-execution-microstructure` | Slippage, fills, market impact | High - assumes imperfect execution |
+| `quant-capital-allocation-risk` | Position sizing, tail risk | High - assumes correlations break |
+| `quant-manager-audit` | Final classification | Requires agent consensus |
+
+---
 
 ## Installation
 
 ### Quick install
 
 ```bash
-# Create commands directory if it doesn't exist
 mkdir -p ~/.claude/commands
 
-# Download the command
-curl -sL "https://raw.githubusercontent.com/YoungMoneyInvestments/whats-next-agent/main/commands/whats-next.md" \
-  > ~/.claude/commands/whats-next.md
+curl -sL "https://raw.githubusercontent.com/YoungMoneyInvestments/whats-next-agent/quant/commands/whats-next.md" \
+  > ~/.claude/commands/whats-next-quant.md
 ```
 
 ### Or clone and symlink
 
 ```bash
-git clone https://github.com/YoungMoneyInvestments/whats-next-agent.git
-ln -s $(pwd)/whats-next-agent/commands/whats-next.md ~/.claude/commands/whats-next.md
+git clone -b quant https://github.com/YoungMoneyInvestments/whats-next-agent.git
+ln -s $(pwd)/whats-next-agent/commands/whats-next.md ~/.claude/commands/whats-next-quant.md
 ```
+
+---
+
+## Requirements
+
+**Critical:** The quant agents must be available in your Claude Code environment. These are defined as Task tool subagent_types:
+
+```
+~/.claude/agents/
+├── quant-research-generator.md
+├── quant-skeptic-redteam.md
+├── quant-ml-validation-engineer.md
+├── quant-execution-microstructure.md
+├── quant-capital-allocation-risk.md
+└── quant-manager-audit.md
+```
+
+If these agents aren't configured, the command will fall back to internal role-play (less effective for quant work).
+
+---
 
 ## Usage
 
 ### JSON format (recommended)
 
 ```bash
-/whats-next '{"description": "Build customer churn predictor", "success_criteria": "AUC > 0.85", "constraints": "No PII", "max_iterations": 20}'
+/whats-next-quant '{"description": "ES momentum strategy", "success_criteria": "Sharpe > 1.5, DD < 15%", "constraints": "1-tick slippage", "max_iterations": 25}'
 ```
 
 ### Natural language format
 
 ```bash
-/whats-next Build user authentication with JWT tokens and proper session handling
+/whats-next-quant Build a mean reversion strategy for SPY with walk-forward validation
 ```
 
-When using natural language, the agent infers success criteria and constraints from context.
+When using natural language, the agent infers success criteria (defaults to quant-appropriate constraints).
 
 ### Examples
 
-**ML Pipeline:**
+**Momentum Strategy:**
 ```bash
-/whats-next '{"description": "Build customer churn predictor", "success_criteria": "AUC > 0.85, inference < 100ms", "constraints": "No PII in features", "max_iterations": 20}'
+/whats-next-quant '{"description": "ES futures momentum strategy using 20-day lookback", "success_criteria": "Sharpe > 1.5, max DD < 15%, capacity > $10M", "constraints": "No overnight positions, include 1-tick slippage", "max_iterations": 30}'
 ```
 
-**Web App Feature:**
+**ML Signal:**
 ```bash
-/whats-next '{"description": "Add user authentication", "success_criteria": "All tests pass, secure session handling", "constraints": "Use existing auth library", "max_iterations": 15}'
+/whats-next-quant '{"description": "Random forest classifier for SPY direction", "success_criteria": "AUC > 0.55 OOS, no lookahead, stable across regimes", "constraints": "Walk-forward validation only", "max_iterations": 25}'
 ```
 
-**Refactoring:**
+**Risk Model:**
 ```bash
-/whats-next '{"description": "Migrate from REST to GraphQL", "success_criteria": "All endpoints covered, no breaking changes", "constraints": "Maintain backwards compat", "max_iterations": 30}'
-```
-
-**Minimal (let it figure things out):**
-```bash
-/whats-next Improve this codebase
+/whats-next-quant '{"description": "VaR model for equity portfolio", "success_criteria": "99% VaR accurate within 10% of realized, backtested 10 years", "constraints": "Must handle fat tails and correlation breakdown", "max_iterations": 20}'
 ```
 
 ---
 
-## How it works
+## How It Works
 
-### The 6-Role Self-Play Chain
+### Pipeline Architecture (v2)
 
-Each iteration runs these roles **sequentially**, with each role receiving the previous roles' outputs **inline**:
+Each iteration runs this pipeline with **parallel critique phase**:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  PROPOSER                                                    │
-│  ├─ Input: state.json, previous iteration results           │
-│  ├─ Output: Single proposed step with success criteria      │
-│  └─ Write to: role_outputs/proposer.md                      │
+│  1. STATE READ                                               │
+│     └─ Load state.json, summarize current position          │
 ├─────────────────────────────────────────────────────────────┤
-│  CRITIC                                                      │
-│  ├─ Input: state + PROPOSER output (inline)                 │
-│  ├─ Output: Attack on proposal, failure modes identified    │
-│  └─ Write to: role_outputs/critic.md                        │
+│  2. PROPOSE (Task: quant-research-generator)                │
+│     └─ Pass: state summary, previous results (inline)       │
+│     └─ Capture output → write to role_outputs/proposer.md   │
 ├─────────────────────────────────────────────────────────────┤
-│  ALTERNATIVES                                                │
-│  ├─ Input: state + PROPOSER + CRITIC outputs (inline)       │
-│  ├─ Output: 3-5 competing steps with success criteria       │
-│  └─ Write to: role_outputs/alternatives.md                  │
+│  3. PARALLEL CRITIQUE PHASE                                  │
+│     Run 4 agents IN PARALLEL (no dependencies):             │
+│                                                              │
+│     ├─ Task: quant-skeptic-redteam                          │
+│     ├─ Task: quant-ml-validation-engineer                   │
+│     ├─ Task: quant-execution-microstructure                 │
+│     └─ Task: quant-capital-allocation-risk                  │
+│                                                              │
+│     Each receives: state + proposer output (inline)         │
+│     Each returns: APPROVE / BLOCK / CONDITIONAL verdict     │
 ├─────────────────────────────────────────────────────────────┤
-│  ARBITER                                                     │
-│  ├─ Input: state + all previous role outputs (inline)       │
-│  ├─ Output: Scored ranking, ONE selected step               │
-│  └─ Write to: role_outputs/arbiter.md                       │
+│  4. EXECUTE CHOSEN STEP                                      │
+│     └─ Select step with fewest blocking objections          │
+│     └─ Run via sandbox, produce artifacts                   │
+│     └─ Run objective gates                                  │
 ├─────────────────────────────────────────────────────────────┤
-│  EXECUTOR                                                    │
-│  ├─ Input: state + ARBITER decision (inline)                │
-│  ├─ Output: Execution results, artifacts, evidence          │
-│  └─ Write to: role_outputs/executor.md                      │
+│  5. AUDIT (Task: quant-manager-audit)                        │
+│     └─ Pass: ALL agent outputs inline + gate results        │
+│     └─ Receive: classification + consensus status           │
 ├─────────────────────────────────────────────────────────────┤
-│  REFEREE                                                     │
-│  ├─ Input: state + all role outputs + gate results (inline) │
-│  ├─ Output: Convergence assessment, continue/pivot/stop     │
-│  └─ Write to: role_outputs/referee.md                       │
+│  6. LOG AND LOOP                                             │
+│     └─ Update state.json with votes, classification         │
+│     └─ Write experiment JSON, append to journal             │
+│     └─ If not done, start next iteration                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Context Passing (v2 improvement)
+### Inline Context Passing (v2 Critical Fix)
 
-Each role receives previous outputs **inline in its prompt**, not by file reference. This prevents context loss between roles.
+Each agent receives all relevant context **inline in its prompt**, not by file reference:
 
-### Scoring Rubric (0-5 each)
+```python
+# Pseudocode for agent dispatch
+Task(
+  subagent_type: "quant-skeptic-redteam",
+  prompt: """
+You are reviewing a quant research proposal.
 
-| Criterion | Description |
-|-----------|-------------|
-| Information gain | How much do we learn? |
-| Uncertainty reduction | Does this narrow unknowns? |
-| Risk reduction | Does this reduce project risk? |
-| Measurability | Can we objectively evaluate? |
-| Reproducibility | Can results be replicated? |
-| Impact on success criteria | Direct progress toward goal? |
-| Convergence contribution | Move toward done? |
+## CURRENT STATE
+- Iteration: {iteration}
+- Classification: {classification}
+- Completed: {completed_list}
 
-**Penalties:**
-- Parameter tuning without validation: -2
-- Complexity increase without learning: -2
-- Steps that cannot be objectively evaluated: -3
+## PROPOSAL TO ATTACK
+{full proposer.md content here}
 
-### Stop Conditions
+## YOUR TASK
+Attack all assumptions. Return verdict: APPROVE / BLOCK / CONDITIONAL
+"""
+)
+```
 
-| Condition | Action |
-|-----------|--------|
-| All success criteria met | `<DONE>` with summary |
-| Max iterations reached | `<DONE>` with blockers |
-| 2 consecutive low-info-gain | `<DONE>` explaining boundary |
-| Critical ambiguity | Asks ONE clarifying question |
+This prevents context loss between agent dispatches.
+
+### Parallel Dispatch (v2 Performance)
+
+The critique phase runs 4 agents simultaneously:
+
+```python
+# Single message with multiple Task calls
+Task(subagent_type: "quant-skeptic-redteam", ..., run_in_background: true)
+Task(subagent_type: "quant-ml-validation-engineer", ..., run_in_background: true)
+Task(subagent_type: "quant-execution-microstructure", ..., run_in_background: true)
+Task(subagent_type: "quant-capital-allocation-risk", ..., run_in_background: true)
+
+# Then collect with TaskOutput
+```
+
+---
+
+## Classification System
+
+The `quant-manager-audit` agent assigns one classification per iteration:
+
+| Classification | Meaning | Consensus Required | Next Action |
+|----------------|---------|-------------------|-------------|
+| `research_only` | Interesting but unproven | No | Continue iterating |
+| `paper_alpha` | Backtested, not live-ready | Partial | Harden execution/risk |
+| `capital_deployable` | Production ready | **Yes - ALL agents** | May output `<DONE>` |
+| `rejected` | Does not survive scrutiny | No | Pivot or stop |
+
+### Consensus Rules
+
+```json
+{
+  "consensus": true,
+  "conditions": [
+    "No agents have verdict = BLOCK",
+    "quant-manager-audit classification = capital_deployable",
+    "All mandatory checks passed"
+  ]
+}
+```
+
+**The loop only completes when classification is `capital_deployable` AND `consensus = true`.**
+
+---
+
+## Mandatory Checks
+
+Every iteration enforces these checks via specialized agents:
+
+### Anti-Goodhart (quant-ml-validation-engineer)
+- How could the optimized metric be misleading?
+- What perverse behavior does optimizing this incentivize?
+
+### Null Hypothesis (quant-skeptic-redteam)
+- What would falsify this hypothesis?
+- Is there a simpler (non-alpha) explanation?
+
+### Negative Expectation (quant-skeptic-redteam)
+- When does this strategy lose money?
+- What regime change would break it?
+
+### Execution Reality (quant-execution-microstructure)
+- How much edge is consumed by costs?
+- Performance with realistic fills?
+- Capacity constraints?
+
+### Capital Scaling (quant-capital-allocation-risk)
+- How does performance degrade with size?
+- Correlation with existing strategies?
+- Tail risk under stress?
 
 ---
 
@@ -156,17 +242,18 @@ Each role receives previous outputs **inline in its prompt**, not by file refere
 ```
 .whatsnext/
 ├── config.json           # Parsed input configuration
-├── state.json            # Current loop state
+├── state.json            # Current loop state (schema below)
 ├── journal.md            # Human-readable decision timeline
 ├── experiments/          # One JSON per iteration
 │   └── iteration_NNN.json
-├── role_outputs/         # Each role's output per iteration
+├── role_outputs/         # Agent outputs per iteration
 │   ├── proposer.md
 │   ├── critic.md
-│   ├── alternatives.md
-│   ├── arbiter.md
+│   ├── validator.md
+│   ├── execution.md
+│   ├── risk.md
 │   ├── executor.md
-│   └── referee.md
+│   └── arbiter.md
 └── checkpoints/          # Git context snapshots
 ```
 
@@ -181,86 +268,30 @@ Each role receives previous outputs **inline in its prompt**, not by file refere
   "constraints": "...",
   "max_iterations": 25,
 
+  "classification": "research_only",
   "confidence": "low",
-  "entropy": "high",
 
   "completed": [],
   "unknowns": [],
   "risks": [],
 
-  "role_consensus": {
-    "proposer": null,
-    "critic": null,
-    "alternatives": null,
-    "arbiter": null,
-    "executor": null,
-    "referee": null
+  "agent_votes": {
+    "quant-research-generator": null,
+    "quant-skeptic-redteam": null,
+    "quant-ml-validation-engineer": null,
+    "quant-execution-microstructure": null,
+    "quant-capital-allocation-risk": null,
+    "quant-manager-audit": null
   },
+
+  "blocking_agents": [],
+  "consensus": false,
 
   "chosen_step": null,
   "last_gate_results": {},
-  "stall_count": 0,
   "low_info_streak": 0
 }
 ```
-
----
-
-## Priority Order
-
-The agent addresses issues in this order:
-
-### General Projects
-1. Correctness and reproducibility
-2. Tests and evaluation harness
-3. Data integrity
-4. Baselines and comparisons
-5. Performance optimization
-6. Deployment safety
-
-### Quant/Trading Projects (auto-detected)
-1. Data correctness (timestamps, survivorship)
-2. Leakage-safe validation
-3. Baselines and null models
-4. Execution realism (slippage, fees, latency)
-5. Risk limits and drawdowns
-6. Regime robustness
-7. Monitoring and kill switches
-
----
-
-## Objective Gates
-
-The agent runs available validation automatically:
-
-```bash
-# If Makefile exists:
-make test
-make whatsnext-checks
-make backtest          # if relevant
-make ml-eval           # if relevant
-
-# Otherwise:
-pytest
-npm test
-go test
-# etc.
-```
-
-**No PASS without running gates.**
-
----
-
-## Error Handling (v2)
-
-| Error | Recovery |
-|-------|----------|
-| Gate command fails | Log error, mark as "error", continue |
-| File write fails | Retry once, then log and continue |
-| Git command fails | Log warning, continue without checkpoint |
-| Sandbox timeout | Log timeout, reduce scope, retry |
-
-Never crashes on recoverable errors.
 
 ---
 
@@ -277,35 +308,38 @@ STATE ASSESSMENT
 ├─ Completed: [list]
 ├─ Unknown: [list]
 ├─ Key Risks: [list]
-├─ Confidence: [low/medium/high]
-└─ Entropy: [low/medium/high]
+├─ Classification: [research_only / paper_alpha / capital_deployable / rejected]
+└─ Consensus: [true/false] - Blocking: [agent list]
 
-SELF-PLAY RESULTS
-├─ Proposer: [proposed step summary]
-├─ Critic: [key objections]
-├─ Alternatives: [count] alternatives generated
-├─ Arbiter: Selected [step] with score [N]
-├─ Executor: [execution summary]
-└─ Referee: [continue/pivot/stop] - [reasoning]
+AGENT DISPATCHES
+├─ quant-research-generator: [proposal summary]
+├─ quant-skeptic-redteam: [verdict] - [key objections]
+├─ quant-ml-validation-engineer: [verdict] - [validation status]
+├─ quant-execution-microstructure: [verdict] - [execution concerns]
+├─ quant-capital-allocation-risk: [verdict] - [risk assessment]
+└─ quant-manager-audit: [classification] - [reasoning]
 
 CHOSEN STEP
-├─ Step: [what was selected]
-├─ Why: [arbiter reasoning]
-└─ Success Criteria: [how we measure]
-
-EXECUTION AND EVIDENCE
-├─ Commands run: [list]
-├─ Artifacts: [list]
-└─ Metrics: [measurements]
+├─ Step: [what was executed]
+├─ Why: [selection reasoning]
+└─ Evidence: [artifacts produced]
 
 GATE RESULTS
 ├─ Tests: [pass/fail/skipped]
-├─ Lints: [pass/fail/skipped]
-└─ Custom: [pass/fail/skipped]
+├─ Backtest: [metrics or skipped]
+└─ Validation: [pass/fail/skipped]
+
+MANDATORY CHECKS
+├─ Anti-Goodhart: [status]
+├─ Null Hypothesis: [status]
+├─ Negative Expectation: [status]
+├─ Execution Reality: [status]
+└─ Capital Scaling: [status]
 
 CONVERGENCE
+├─ Classification: [current]
+├─ Consensus: [true/false]
 ├─ Info Gain: [high/medium/low]
-├─ Stall Count: [N]
 └─ Decision: [continue/pivot/stop]
 
 LOG WRITEBACK: [confirmed]
@@ -314,22 +348,57 @@ LOG WRITEBACK: [confirmed]
 
 ---
 
-## Tips
+## Stop Conditions
 
-### Let it run
-The default behavior is to loop without asking questions. Trust the process.
+| Condition | Action |
+|-----------|--------|
+| Capital Deployable + Consensus | `<DONE>` with success summary |
+| Max iterations reached | `<DONE>` with classification and blockers |
+| Rejected by audit | `<DONE>` explaining why |
+| Two consecutive Rejections | Stop, explain boundary |
+| Critical ambiguity | Asks ONE question and stops |
 
-### Check the journal
-`.whatsnext/journal.md` is the best place to understand what happened and why.
+---
 
-### Resume after interruption
-State is persistent. Just run `/whats-next` again with the same parameters.
+## Error Handling (v2)
 
-### Increase iterations for complex projects
-Default is 25. Large refactors or research projects may need 50+.
+### Agent Fallback Protocol
 
-### Add project-specific gates
-Create a `Makefile` with `whatsnext-checks` target for custom validation.
+| Failure | Recovery |
+|---------|----------|
+| Task tool error | Retry once, then fall back to internal role-play |
+| Agent returns empty | Log warning, treat as CONDITIONAL |
+| Agent timeout | Log timeout, treat as CONDITIONAL with note |
+
+When falling back:
+1. Log to journal: "Agent {name} unavailable, using internal role-play"
+2. Reduce confidence by one level
+3. Add to risks: "Reduced scrutiny from {agent}"
+
+Never skip a perspective entirely.
+
+### General Errors
+
+| Error | Recovery |
+|-------|----------|
+| Gate command fails | Log error, mark as "error", continue |
+| File write fails | Retry once, then log and continue |
+| Sandbox timeout | Log timeout, reduce scope, retry |
+
+---
+
+## Comparison: Generic vs Quant
+
+| Aspect | Generic (main) | Quant (this branch) |
+|--------|----------------|---------------------|
+| Skepticism | Role-played | Hardcoded in agents |
+| Agent separation | Same context | Separate contexts |
+| Critique phase | Sequential | **Parallel** |
+| Execution check | Optional | Mandatory |
+| Risk check | Optional | Mandatory |
+| Classification | None | 4-level system |
+| Completion gate | Self-assessed | Agent consensus |
+| Context passing | Inline | Inline + explicit capture |
 
 ---
 
@@ -337,26 +406,29 @@ Create a `Makefile` with `whatsnext-checks` target for custom validation.
 
 ### v2 (Current)
 - **JSON input format** - Structured input with fallback to natural language
-- **Inline context passing** - Each role receives previous outputs directly in prompt
-- **Structured state.json** - Explicit schema with role_consensus tracking
-- **Error handling** - Recovery procedures for common failures
-- **Output contract** - Consistent iteration output format
+- **Inline context passing** - Each agent receives all context directly in prompt
+- **Parallel critique phase** - 4 agents run simultaneously
+- **Structured agent verdicts** - APPROVE / BLOCK / CONDITIONAL
+- **Agent votes tracking** - Explicit state.json schema with blocking_agents
+- **Fallback protocol** - Recovery when agents fail
+- **Output contract** - Consistent iteration output with mandatory checks section
 
 ### v1
-- Initial release with 6-role self-play
+- Initial release with real agent dispatch
+- Sequential agent calls
 - File-based context passing (prone to loss)
 - Unstructured argument parsing
 
 ---
 
-## Branches
+## Integration with Existing Quant Tools
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Generic project-agnostic version (internal role-play) |
-| `quant` | Quant-specialized with real agent dispatch |
+This command works well with:
 
-For quant/trading work, the `quant` branch dispatches to 6 specialized agents with hardcoded skepticism that cannot be negotiated away.
+- **TradingCore** - Data fetching, model registry, risk management
+- **DataGuard** - Pre-flight validation for data availability
+- **ralph-quant** - Can be used together for different workflows
+- **BrokerBridge** - IBKR connectivity for live validation
 
 ---
 
@@ -364,6 +436,7 @@ For quant/trading work, the `quant` branch dispatches to 6 specialized agents wi
 
 - [Claude Code](https://claude.ai/code) CLI
 - Git (for checkpoints)
+- Quant agents configured in `~/.claude/agents/`
 - Project-specific tooling (pytest, make, etc.)
 
 ## License
@@ -372,7 +445,7 @@ MIT
 
 ## Contributing
 
-PRs welcome. Please include:
-- Clear description of the change
-- Why it improves the autonomous loop
-- Any new failure modes it might introduce
+PRs welcome. For quant-specific changes, include:
+- Which agent behavior is affected
+- Whether it changes the skepticism level
+- Test case showing the change in action
