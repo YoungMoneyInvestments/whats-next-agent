@@ -1,33 +1,87 @@
-# Example Makefile with /whats-next compatible targets
+# Example Makefile for quant projects with /whats-next compatible targets
 # Copy to your project and customize
 
-.PHONY: test whatsnext-checks backtest ml-eval lint
+.PHONY: test whatsnext-checks backtest ml-eval lint validate-data
 
-# Standard test target
+# ══════════════════════════════════════════════════════════════
+# STANDARD TARGETS
+# ══════════════════════════════════════════════════════════════
+
 test:
-	pytest tests/ -v
+	pytest tests/ -v --tb=short
 
-# Custom checks for /whats-next agent
-# Add project-specific validation here
-whatsnext-checks:
-	@echo "Running whatsnext checks..."
-	# Lint check
-	ruff check . || true
-	# Type check
-	mypy src/ --ignore-missing-imports || true
-	# Security scan
-	bandit -r src/ -ll || true
-	@echo "whatsnext checks complete"
-
-# For trading/quant projects
-backtest:
-	python scripts/backtest.py --validate
-
-# For ML projects
-ml-eval:
-	python scripts/evaluate_model.py --holdout
-
-# Standard lint
 lint:
 	ruff check . --fix
 	black .
+
+# ══════════════════════════════════════════════════════════════
+# QUANT-SPECIFIC TARGETS (used by /whats-next)
+# ══════════════════════════════════════════════════════════════
+
+# Main validation target - runs all checks
+whatsnext-checks: validate-data lint test backtest ml-eval
+	@echo "══════════════════════════════════════════════════════"
+	@echo "All whatsnext checks complete"
+	@echo "══════════════════════════════════════════════════════"
+
+# Data validation (uses DataGuard if available)
+validate-data:
+	@echo "Validating data availability..."
+	python -c "from trading_core.data import DataFetcher; DataFetcher().validate()" || \
+		echo "WARNING: TradingCore not available, skipping data validation"
+
+# Backtest with execution realism
+backtest:
+	@echo "Running backtest with execution simulation..."
+	python scripts/backtest.py \
+		--slippage-ticks 1 \
+		--commission-per-contract 2.50 \
+		--validate-no-lookahead \
+		--output .whatsnext/backtest_results.json
+	@echo "Backtest results written to .whatsnext/backtest_results.json"
+
+# ML model evaluation (if applicable)
+ml-eval:
+	@echo "Evaluating ML model..."
+	python scripts/evaluate_model.py \
+		--walk-forward \
+		--check-leakage \
+		--output .whatsnext/ml_eval_results.json || \
+		echo "No ML model to evaluate, skipping"
+
+# ══════════════════════════════════════════════════════════════
+# INDIVIDUAL CHECK TARGETS
+# ══════════════════════════════════════════════════════════════
+
+# Check for lookahead bias
+check-lookahead:
+	python scripts/lookahead_detector.py --strict
+
+# Check execution assumptions
+check-execution:
+	python scripts/execution_simulator.py \
+		--scenario stress \
+		--report .whatsnext/execution_report.json
+
+# Check capacity limits
+check-capacity:
+	python scripts/capacity_analysis.py \
+		--target-aum 10000000 \
+		--report .whatsnext/capacity_report.json
+
+# Check regime sensitivity
+check-regimes:
+	python scripts/regime_analysis.py \
+		--regimes "2008-crisis,2020-covid,2022-rates" \
+		--report .whatsnext/regime_report.json
+
+# ══════════════════════════════════════════════════════════════
+# REPORTING
+# ══════════════════════════════════════════════════════════════
+
+# Generate summary report
+report:
+	python scripts/generate_report.py \
+		--input-dir .whatsnext \
+		--output .whatsnext/summary_report.md
+	@cat .whatsnext/summary_report.md
