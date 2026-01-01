@@ -1,0 +1,33 @@
+# Example Makefile with /whats-next compatible targets
+# Copy to your project and customize
+
+.PHONY: test whatsnext-checks backtest ml-eval lint
+
+# Standard test target
+test:
+	pytest tests/ -v
+
+# Custom checks for /whats-next agent
+# Add project-specific validation here
+whatsnext-checks:
+	@echo "Running whatsnext checks..."
+	# Lint check
+	ruff check . || true
+	# Type check
+	mypy src/ --ignore-missing-imports || true
+	# Security scan
+	bandit -r src/ -ll || true
+	@echo "whatsnext checks complete"
+
+# For trading/quant projects
+backtest:
+	python scripts/backtest.py --validate
+
+# For ML projects
+ml-eval:
+	python scripts/evaluate_model.py --holdout
+
+# Standard lint
+lint:
+	ruff check . --fix
+	black .

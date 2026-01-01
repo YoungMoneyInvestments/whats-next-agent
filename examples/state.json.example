@@ -1,0 +1,32 @@
+{
+  "objective": "Build momentum strategy for ES futures",
+  "success_criteria": [
+    "Sharpe ratio > 1.5",
+    "Max drawdown < 15%",
+    "No lookahead bias",
+    "Slippage modeled at 1 tick"
+  ],
+  "constraints": [
+    "Use only daily bars",
+    "No overnight positions"
+  ],
+  "iteration": 1,
+  "confidence": "low",
+  "entropy": "high",
+  "knowns": [],
+  "unknowns": [
+    "Optimal lookback period",
+    "Position sizing approach",
+    "Entry/exit signal thresholds"
+  ],
+  "risks": [
+    "Regime change during backtest period",
+    "Overfitting to recent data"
+  ],
+  "last_winner_step": null,
+  "stall_count": 0,
+  "experiment_counter": 0,
+  "project_type": "quant",
+  "created_at": "2025-01-01T00:00:00Z",
+  "updated_at": "2025-01-01T00:00:00Z"
+}
